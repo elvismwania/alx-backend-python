@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inbox & Conversation</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { max-width: 900px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1, h2 { color: #0056b3; }
+        .messages { border: 1px solid #ddd; border-radius: 5px; margin-bottom: 20px; }
+        .message-item { padding: 10px; border-bottom: 1px solid #eee; }
+        .message-item:last-child { border-bottom: none; }
+        .message-item strong { color: #007bff; }
+        .unread { background-color: #e6f7ff; font-weight: bold; }
+        .conversation-thread { margin-left: 20px; border-left: 2px solid #ccc; padding-left: 10px; }
+        .reply-level-1 { margin-left: 20px; border-left: 2px solid #a0a0a0; padding-left: 10px; }
+        .reply-level-2 { margin-left: 40px; border-left: 2px solid #b0b0b0; padding-left: 10px; }
+        .reply-level-3 { margin-left: 60px; border-left: 2px solid #c0c0c0; padding-left: 10px; }
+        .message-content { margin-top: 5px; }
+        .timestamp { font-size: 0.8em; color: #777; margin-top: 5px; }
+        .errorlist { color: red; list-style-type: none; padding: 0; }
+        .messages-container { margin-top: 20px; }
+        .alert { padding: 10px; margin-bottom: 15px; border-radius: 4px; }
+        .alert-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        a { color: #007bff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Welcome, {{ request.user.username }}!</h1>
+
+        {% if messages %}
+            <ul class="messages-container">
+                {% for message in messages %}
+                    <li class="alert alert-{{ message.tags }}">{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+        <h2>Your Unread Messages</h2>
+        {% if unread_messages %}
+            <div class="messages">
+                {% for message in unread_messages %}
+                    <div class="message-item unread">
+                        <p><strong>From:</strong> {{ message.sender.username }}</p>
+                        <p><strong>Content:</strong> {{ message.content }}</p>
+                        <p class="timestamp">Received: {{ message.timestamp|date:"M d, Y H:i" }}</p>
+                        <p><a href="{% url 'messaging:inbox_and_conversation_detail' message.id %}">View Conversation</a></p>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>You have no unread messages.</p>
+        {% endif %}
+
+        {% if selected_message %}
+            <h2>Conversation Thread</h2>
+            <div class="messages">
+                <div class="message-item">
+                    <h3>Original Message (ID: {{ selected_message.id }})</h3>
+                    <p><strong>From:</strong> {{ selected_message.sender.username }} <strong>To:</strong> {{ selected_message.receiver.username }}</p>
+                    <p class="message-content">{{ selected_message.content }}</p>
+                    <p class="timestamp">Sent: {{ selected_message.timestamp|date:"M d, Y H:i" }} {% if selected_message.edited %}(Edited){% endif %}</p>
+                    {% if selected_message.history.exists %}
+                        <p><a href="#" onclick="document.getElementById('history-{{ selected_message.id }}').style.display = document.getElementById('history-{{ selected_message.id }}').style.display === 'none' ? 'block' : 'none'; return false;">View Edit History</a></p>
+                        <div id="history-{{ selected_message.id }}" style="display: none; margin-top: 10px; border: 1px dashed #ccc; padding: 5px;">
+                            <h4>Edit History:</h4>
+                            <ul>
+                                {% for history_entry in selected_message.history.all %}
+                                    <li>
+                                        <p><strong>Old Content:</strong> {{ history_entry.old_content }}</p>
+                                        <p class="timestamp">Edited at: {{ history_entry.edited_at|date:"M d, Y H:i" }} by {{ history_entry.edited_by.username|default:"Unknown" }}</p>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+                </div>
+
+                {% if conversation_messages %}
+                    <div class="conversation-thread">
+                        <h3>Replies:</h3>
+                        {% for thread_data in conversation_messages %}
+                            {% include 'messaging/message_reply_template.html' with message=thread_data.message replies=thread_data.replies level=1 %}
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p>No replies in this conversation yet.</p>
+                {% endif %}
+            </div>
+        {% endif %}
+
+        <p><a href="{% url 'messaging:delete_account' %}">Delete My Account</a></p>
+        <p><a href="{% url 'admin:index' %}">Go to Admin</a></p>
+        <p><a href="{% url 'logout' %}">Logout</a></p>
+    </div>
+</body>
+</html>
