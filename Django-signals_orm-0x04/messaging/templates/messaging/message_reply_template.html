@@ -1,0 +1,32 @@
+{% comment %}
+This template is used recursively to display threaded replies.
+It expects 'message', 'replies', and 'level' context variables.
+{% endcomment %}
+
+<div class="message-item reply-level-{{ level }}">
+    <p><strong>From:</strong> {{ message.sender.username }} <strong>To:</strong> {{ message.receiver.username }}</p>
+    <p class="message-content">{{ message.content }}</p>
+    <p class="timestamp">Sent: {{ message.timestamp|date:"M d, Y H:i" }} {% if message.edited %}(Edited){% endif %}</p>
+    {% if message.history.exists %}
+        <p><a href="#" onclick="document.getElementById('history-{{ message.id }}').style.display = document.getElementById('history-{{ message.id }}').style.display === 'none' ? 'block' : 'none'; return false;">View Edit History</a></p>
+        <div id="history-{{ message.id }}" style="display: none; margin-top: 10px; border: 1px dashed #ccc; padding: 5px;">
+            <h4>Edit History:</h4>
+            <ul>
+                {% for history_entry in message.history.all %}
+                    <li>
+                        <p><strong>Old Content:</strong> {{ history_entry.old_content }}</p>
+                        <p class="timestamp">Edited at: {{ history_entry.edited_at|date:"M d, Y H:i" }} by {{ history_entry.edited_by.username|default:"Unknown" }}</p>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    {% if replies %}
+        <div class="conversation-thread">
+            {% for thread_data in replies %}
+                {% include 'messaging/message_reply_template.html' with message=thread_data.message replies=thread_data.replies level=level|add:1 %}
+            {% endfor %}
+        </div>
+    {% endif %}
+</div>
