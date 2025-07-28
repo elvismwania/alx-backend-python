@@ -5,6 +5,8 @@ from django.contrib.auth.models import User
 from .models import Message, Notification, MessageHistory
 from django.db.models import signals # Import signals module to disconnect
 from messaging.signals import create_notification_on_message, log_message_edit, cleanup_user_data_on_delete # Import signal handlers
+from django.db import connection # To count queries
+from django.core.cache import cache # To interact with cache
 
 class MessageSignalTest(TestCase):
 
@@ -21,58 +23,45 @@ class MessageSignalTest(TestCase):
         post_save.connect(create_notification_on_message, sender=Message)
         pre_save.connect(log_message_edit, sender=Message)
         post_delete.connect(cleanup_user_data_on_delete, sender=User) # Connect the new signal
+        cache.clear() # Clear cache before each test to ensure fresh state
 
     def tearDown(self):
         # Disconnect signals after each test to prevent interference between tests
         post_save.disconnect(create_notification_on_message, sender=Message)
         pre_save.disconnect(log_message_edit, sender=Message)
         post_delete.disconnect(cleanup_user_data_on_delete, sender=User) # Disconnect the new signal
+        cache.clear() # Clear cache after each test
 
     def test_notification_created_on_new_message(self):
         """
         Test that a Notification is automatically created when a new Message is saved.
         """
-        # Ensure no notifications exist initially for receiver_user
         self.assertEqual(Notification.objects.filter(user=self.user2).count(), 0)
-
-        # Create a new message
         message = Message.objects.create(
             sender=self.user1,
             receiver=self.user2,
             content="Hello there!"
         )
-
-        # After message creation, a notification should exist
         self.assertEqual(Notification.objects.filter(user=self.user2).count(), 1)
-
-        # Get the created notification
         notification = Notification.objects.get(user=self.user2)
-
-        # Check if the notification is linked to the correct message and user
         self.assertEqual(notification.message, message)
         self.assertEqual(notification.user, self.user2)
-        self.assertFalse(notification.is_read) # Should be unread by default
-        self.assertFalse(message.edited) # Should not be edited on creation
+        self.assertFalse(notification.is_read)
+        self.assertFalse(message.edited)
 
 
     def test_no_notification_on_message_update(self):
         """
         Test that no new Notification is created when an existing Message is updated.
         """
-        # Create an initial message
         message = Message.objects.create(
             sender=self.user1,
             receiver=self.user2,
             content="Initial content"
         )
-        # Ensure one notification exists from the initial creation
         self.assertEqual(Notification.objects.filter(user=self.user2).count(), 1)
-
-        # Update the message (this should not trigger a new notification)
         message.content = "Updated content"
         message.save()
-
-        # The count of notifications should remain 1
         self.assertEqual(Notification.objects.filter(user=self.user2).count(), 1)
 
     def test_message_edit_history(self):
@@ -80,7 +69,6 @@ class MessageSignalTest(TestCase):
         Test that MessageHistory is created, 'edited' flag is set, and 'edited_by' is correct
         when a message is updated.
         """
-        # Create an initial message
         message = Message.objects.create(
             sender=self.user1,
             receiver=self.user2,
@@ -89,24 +77,20 @@ class MessageSignalTest(TestCase):
         self.assertFalse(message.edited)
         self.assertEqual(MessageHistory.objects.count(), 0)
 
-        # Update the message content
         old_content = message.content
         message.content = "New, edited message content."
         message.save()
 
-        # Check that a MessageHistory entry was created
         self.assertEqual(MessageHistory.objects.count(), 1)
         history_entry = MessageHistory.objects.first()
 
         self.assertEqual(history_entry.message, message)
         self.assertEqual(history_entry.old_content, old_content)
-        self.assertEqual(history_entry.edited_by, self.user1) # Check edited_by
+        self.assertEqual(history_entry.edited_by, self.user1)
 
-        # Retrieve the message again from DB to ensure 'edited' flag is saved
         updated_message = Message.objects.get(pk=message.pk)
         self.assertTrue(updated_message.edited)
 
-        # Update again to ensure another history entry is created
         old_content_2 = updated_message.content
         updated_message.content = "Second edit."
         updated_message.save()
@@ -114,7 +98,7 @@ class MessageSignalTest(TestCase):
         self.assertEqual(MessageHistory.objects.count(), 2)
         history_entry_2 = MessageHistory.objects.order_by('-edited_at').first()
         self.assertEqual(history_entry_2.old_content, old_content_2)
-        self.assertEqual(history_entry_2.edited_by, self.user1) # Check edited_by again
+        self.assertEqual(history_entry_2.edited_by, self.user1)
         self.assertTrue(updated_message.edited)
 
     def test_no_history_on_message_creation(self):
@@ -127,7 +111,7 @@ class MessageSignalTest(TestCase):
             receiver=self.user2,
             content="A brand new message."
         )
-        self.assertEqual(MessageHistory.objects.count(), 0) # Should still be 0
+        self.assertEqual(MessageHistory.objects.count(), 0)
 
     def test_no_history_on_no_content_change(self):
         """
@@ -139,12 +123,8 @@ class MessageSignalTest(TestCase):
             content="Content that won't change."
         )
         self.assertEqual(MessageHistory.objects.count(), 0)
-
-        # Save without changing content
         message.save()
-        self.assertEqual(MessageHistory.objects.count(), 0) # Still 0
-
-        # Retrieve from DB and save again without content change
+        self.assertEqual(MessageHistory.objects.count(), 0)
         message_from_db = Message.objects.get(pk=message.pk)
         message_from_db.save()
         self.assertEqual(MessageHistory.objects.count(), 0)
@@ -154,70 +134,196 @@ class MessageSignalTest(TestCase):
         Test that messages, notifications, and message histories are deleted
         when a user account is deleted.
         """
-        # Create messages, notifications, and history for user1 and user2
-        # Message 1: user1 sends to user2
         msg1 = Message.objects.create(sender=self.user1, receiver=self.user2, content="Hi user2!")
-        # Message 2: user2 sends to user1
         msg2 = Message.objects.create(sender=self.user2, receiver=self.user1, content="Hi user1!")
-        # Message 3: user1 sends to user3 (unrelated user)
         msg3 = Message.objects.create(sender=self.user1, receiver=self.user3, content="Hi user3!")
 
-        # Edit msg1 to create history for user1 as editor
         msg1.content = "Hi user2! (edited)"
-        msg1.save() # This creates a MessageHistory entry for msg1, edited by user1
-
-        # Edit msg2 to create history for user2 as editor
+        msg1.save()
         msg2.content = "Hi user1! (edited)"
-        msg2.save() # This creates a MessageHistory entry for msg2, edited by user2
+        msg2.save()
 
-        # Check initial counts
         self.assertEqual(User.objects.count(), 3)
         self.assertEqual(Message.objects.count(), 3)
-        self.assertEqual(Notification.objects.count(), 3) # 3 messages -> 3 notifications
-        self.assertEqual(MessageHistory.objects.count(), 2) # 2 edits -> 2 history entries
+        self.assertEqual(Notification.objects.count(), 3)
+        self.assertEqual(MessageHistory.objects.count(), 2)
 
-        # Get the IDs of messages and history related to user1 before deletion
-        msg1_id = msg1.id
-        msg3_id = msg3.id # msg3 sent by user1
-        history_for_msg1_id = MessageHistory.objects.filter(message=msg1).first().id
-        history_edited_by_user1_count = MessageHistory.objects.filter(edited_by=self.user1).count()
-
-        # Delete user1
         self.user1.delete()
 
-        # Verify user1 is deleted
         self.assertEqual(User.objects.count(), 2)
         self.assertFalse(User.objects.filter(username='sender_user').exists())
-
-        # Verify messages related to user1 are deleted (due to CASCADE)
-        self.assertFalse(Message.objects.filter(id=msg1_id).exists()) # msg1 sent by user1
-        self.assertFalse(Message.objects.filter(id=msg3_id).exists()) # msg3 sent by user1
-        # msg2 should still exist as user2 is sender and user1 is receiver (CASCADE on receiver will delete it)
-        # Re-think: If user1 is sender, msg1 is deleted. If user1 is receiver, msg2 is deleted.
-        # So, all messages where user1 is involved (sender or receiver) should be deleted.
-        self.assertEqual(Message.objects.count(), 0) # All 3 messages should be gone.
-
-        # Verify notifications related to user1 or their messages are deleted (due to CASCADE)
+        self.assertEqual(Message.objects.count(), 0)
         self.assertEqual(Notification.objects.count(), 0)
+        self.assertEqual(MessageHistory.objects.count(), 0)
 
-        # Verify message histories related to user1's messages or edited by user1 are deleted
-        self.assertEqual(MessageHistory.objects.count(), 0) # Both history entries should be gone.
-                                                           # History for msg1 (edited by user1) deleted by signal.
-                                                           # History for msg2 (edited by user2) deleted by CASCADE on message.
-
-        # Test the delete_user view (requires a client and login)
         client = Client()
-        # Create a temporary user for view testing
         temp_user = User.objects.create_user(username='temp_deleter', password='testpassword')
         client.login(username='temp_deleter', password='testpassword')
-
-        # Post to the delete_user view
-        response = client.post('/messaging/delete-account/', follow=True) # Use follow=True for redirect
-
-        # Check for successful deletion message
+        response = client.post('/messaging/delete-account/', follow=True)
         self.assertContains(response, "Your account 'temp_deleter' has been successfully deleted.")
-        # Check that the user is no longer authenticated
         self.assertFalse(response.context['user'].is_authenticated)
-        # Check that the user count has decreased
-        self.assertEqual(User.objects.count(), 1) # user2 and user3 remain, temp_user is gone.
+        self.assertEqual(User.objects.count(), 1)
+
+    # Task 3: Threaded Conversations Tests
+    def test_message_threading(self):
+        """
+        Test that messages can be replied to and replies are linked correctly.
+        """
+        root_msg = Message.objects.create(sender=self.user1, receiver=self.user2, content="Root message.")
+        reply1 = Message.objects.create(sender=self.user2, receiver=self.user1, content="Reply 1.", parent_message=root_msg)
+        reply2 = Message.objects.create(sender=self.user1, receiver=self.user2, content="Reply 2.", parent_message=root_msg)
+        nested_reply = Message.objects.create(sender=self.user2, receiver=self.user1, content="Nested reply.", parent_message=reply1)
+
+        # Check direct replies
+        self.assertEqual(root_msg.replies.count(), 2)
+        self.assertIn(reply1, root_msg.replies.all())
+        self.assertIn(reply2, root_msg.replies.all())
+
+        # Check nested replies
+        self.assertEqual(reply1.replies.count(), 1)
+        self.assertIn(nested_reply, reply1.replies.all())
+        self.assertEqual(reply2.replies.count(), 0)
+
+        # Test get_thread method
+        thread = root_msg.get_thread()
+        self.assertEqual(len(thread), 2) # Should contain reply1 and reply2
+
+        # Verify structure and content
+        self.assertEqual(thread[0]['message'], reply1)
+        self.assertEqual(len(thread[0]['replies']), 1)
+        self.assertEqual(thread[0]['replies'][0]['message'], nested_reply)
+        self.assertEqual(len(thread[0]['replies'][0]['replies']), 0) # No further replies
+
+        self.assertEqual(thread[1]['message'], reply2)
+        self.assertEqual(len(thread[1]['replies']), 0)
+
+    def test_threaded_conversation_orm_efficiency(self):
+        """
+        Test that fetching a threaded conversation uses optimized queries (select_related/prefetch_related).
+        This is a conceptual test; actual query counts depend on Django's internal optimizations.
+        """
+        root_msg = Message.objects.create(sender=self.user1, receiver=self.user2, content="Root.")
+        reply1 = Message.objects.create(sender=self.user2, receiver=self.user1, content="R1.", parent_message=root_msg)
+        reply2 = Message.objects.create(sender=self.user1, receiver=self.user2, content="R2.", parent_message=root_msg)
+        nested_reply = Message.objects.create(sender=self.user2, receiver=self.user1, content="NR1.", parent_message=reply1)
+
+        # Clear queries before the test query
+        connection.queries_log.clear()
+
+        # Fetch the root message with sender/receiver
+        # Then call get_thread which uses select_related for replies' sender/receiver
+        fetched_root_msg = Message.objects.select_related('sender', 'receiver').get(pk=root_msg.pk)
+        thread_data = fetched_root_msg.get_thread()
+
+        # The exact number of queries can vary, but it should be significantly less than N+1.
+        # Expected: 1 for root, 1 for direct replies (prefetch_related or select_related),
+        # then 1 for each level of nested replies.
+        # Here, get_thread recursively calls, so it might issue more queries than a single prefetch_related.
+        # The key is that each `replies.all().select_related('sender', 'receiver')` is optimized.
+        # A rough estimate for this structure (1 root, 2 direct, 1 nested):
+        # 1 (root) + 1 (direct replies) + 1 (nested reply's replies) = 3 queries minimum.
+        # The `get_thread` method as implemented makes a query for each level for each branch.
+        # So, root_msg.replies.all() -> 1 query
+        # reply1.replies.all() -> 1 query
+        # reply2.replies.all() -> 1 query
+        # Total = 3 queries.
+        self.assertLessEqual(len(connection.queries), 3) # Should be around 3-4 queries, not 1+N
+
+        # Accessing attributes to ensure they are loaded without extra queries
+        self.assertIsNotNone(fetched_root_msg.sender.username)
+        self.assertIsNotNone(thread_data[0]['message'].sender.username)
+        self.assertIsNotNone(thread_data[0]['replies'][0]['message'].sender.username)
+
+
+    # Task 4: Custom ORM Manager for Unread Messages
+    def test_unread_messages_manager(self):
+        """
+        Test the custom UnreadMessagesManager and .only() optimization.
+        """
+        # Create messages, some read, some unread
+        msg1_unread = Message.objects.create(sender=self.user1, receiver=self.user2, content="Unread 1", read=False)
+        msg2_read = Message.objects.create(sender=self.user1, receiver=self.user2, content="Read 1", read=True)
+        msg3_unread = Message.objects.create(sender=self.user3, receiver=self.user2, content="Unread 2", read=False)
+        msg4_to_user1 = Message.objects.create(sender=self.user2, receiver=self.user1, content="To user1", read=False)
+
+        # Test for user2's unread messages
+        unread_for_user2 = Message.unread_messages.for_user(self.user2)
+        self.assertEqual(unread_for_user2.count(), 2)
+        self.assertIn(msg1_unread, unread_for_user2)
+        self.assertIn(msg3_unread, unread_for_user2)
+        self.assertNotIn(msg2_read, unread_for_user2)
+        self.assertNotIn(msg4_to_user1, unread_for_user2)
+
+        # Test for user1's unread messages
+        unread_for_user1 = Message.unread_messages.for_user(self.user1)
+        self.assertEqual(unread_for_user1.count(), 1)
+        self.assertIn(msg4_to_user1, unread_for_user1)
+
+        # Test .only() functionality (conceptual check, hard to assert directly)
+        # We can check that accessing non-included fields would cause a new query if .only() was effective.
+        # However, .only() is an internal optimization. We primarily test the manager's filtering.
+        # The manager itself applies .only()
+        first_unread = unread_for_user2.first()
+        # Accessing a field that *should* be included by .only()
+        self.assertIsNotNone(first_unread.content)
+        # Accessing a related field that *should not* be included by .only() directly on the message
+        # but is accessed via select_related in the view.
+        # This test is more about the manager returning the correct queryset.
+
+    def test_message_read_status_update_on_view(self):
+        """
+        Test that a message's 'read' status is updated when viewed via the inbox_and_conversation_view.
+        """
+        message_to_view = Message.objects.create(sender=self.user1, receiver=self.user2, content="View me!", read=False)
+        self.assertFalse(message_to_view.read)
+
+        client = Client()
+        client.login(username='receiver_user', password='password123')
+
+        # Access the view for this specific message
+        response = client.get(f'/messaging/inbox/{message_to_view.id}/')
+        self.assertEqual(response.status_code, 200)
+
+        # Refresh the message from the database and check its read status
+        updated_message = Message.objects.get(pk=message_to_view.pk)
+        self.assertTrue(updated_message.read)
+
+        # Ensure that other unread messages for the user are not marked read
+        another_unread = Message.objects.create(sender=self.user1, receiver=self.user2, content="Another unread", read=False)
+        updated_another_unread = Message.objects.get(pk=another_unread.pk)
+        self.assertFalse(updated_another_unread.read)
+
+    # Task 5: Basic View Cache Test (Conceptual)
+    def test_inbox_view_caching(self):
+        """
+        Test that the inbox_and_conversation_view is cached.
+        This is a conceptual test as directly asserting cache hits in unit tests is complex.
+        We'll check query counts for initial and subsequent requests.
+        """
+        client = Client()
+        client.login(username='receiver_user', password='password123')
+
+        # Create some messages to ensure queries are made
+        Message.objects.create(sender=self.user1, receiver=self.user2, content="Cached message 1")
+        Message.objects.create(sender=self.user1, receiver=self.user2, content="Cached message 2")
+
+        # First request - should hit the database
+        connection.queries_log.clear()
+        response1 = client.get('/messaging/inbox/')
+        self.assertEqual(response1.status_code, 200)
+        queries_first_request = len(connection.queries)
+        self.assertGreater(queries_first_request, 0) # Should make some queries
+
+        # Second request - should hit the cache, resulting in fewer (ideally 0) queries
+        connection.queries_log.clear()
+        response2 = client.get('/messaging/inbox/')
+        self.assertEqual(response2.status_code, 200)
+        queries_second_request = len(connection.queries)
+        # The number of queries should be significantly less, ideally 0 if fully cached.
+        # Django's cache_page might still do a few internal queries (e.g., for session, user).
+        # The key is that application-level model queries are avoided.
+        self.assertLess(queries_second_request, queries_first_request)
+        # A more robust check might involve mocking cache backend or inspecting cache keys.
+        # For LocMemCache, it's hard to guarantee 0 queries, but it should be very low.
+        self.assertLessEqual(queries_second_request, 2) # Expecting very few queries (e.g., for user auth)
 
