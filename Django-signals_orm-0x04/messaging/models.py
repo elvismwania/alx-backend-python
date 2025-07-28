@@ -1,19 +1,10 @@
+
 # Django-signals_orm-0x04/messaging/models.py
 
 from django.db import models
 from django.contrib.auth.models import User
 from django.db.models import Q
-
-class UnreadMessagesManager(models.Manager):
-    """
-    Custom manager to filter unread messages for a specific user.
-    """
-    def for_user(self, user):
-        # Filters messages received by the user that are not yet read.
-        # Uses .only() to retrieve only necessary fields for efficiency.
-        return self.filter(receiver=user, read=False).only(
-            'sender', 'receiver', 'content', 'timestamp', 'edited', 'parent_message', 'read'
-        ).order_by('-timestamp')
+from .managers import UnreadMessagesManager # Import the custom manager
 
 class Message(models.Model):
     sender = models.ForeignKey(User, related_name='sent_messages', on_delete=models.CASCADE)
@@ -33,8 +24,8 @@ class Message(models.Model):
 
     # Default manager
     objects = models.Manager()
-    # Custom manager for unread messages
-    unread_messages = UnreadMessagesManager()
+    # Custom manager for unread messages, renamed to 'unread'
+    unread = UnreadMessagesManager()
 
     class Meta:
         ordering = ['-timestamp']
@@ -47,10 +38,7 @@ class Message(models.Model):
     def get_thread(self):
         """
         Recursively fetches all replies to this message.
-        This is a simplified example; for very deep threads,
-        a more optimized approach (e.g., using a CTE if supported by DB or
-        fetching all related messages and building the tree in Python) might be needed.
-        For demonstration, we'll fetch direct replies and then recursively call.
+        This method uses select_related for sender/receiver on replies for optimization.
         """
         # Optimized fetching of direct replies with sender/receiver preloaded
         replies = self.replies.all().select_related('sender', 'receiver').order_by('timestamp')
@@ -96,6 +84,4 @@ class MessageHistory(models.Model):
     def __str__(self):
         editor_username = self.edited_by.username if self.edited_by else 'Unknown'
         return f"History for Message ID {self.message.id} by {editor_username} (Edited at {self.edited_at.strftime('%Y-%m-%d %H:%M')})"
-
-
 
