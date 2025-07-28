@@ -7,5 +7,8 @@ app_name = 'messaging' # Namespace for this app's URLs
 
 urlpatterns = [
     path('delete-account/', views.delete_user, name='delete_account'),
-    # Add other messaging-related URLs here as needed
+    # URL for displaying the inbox and optionally a specific conversation
+    path('inbox/', views.inbox_and_conversation_view, name='inbox_and_conversation'),
+    path('inbox/<int:message_id>/', views.inbox_and_conversation_view, name='inbox_and_conversation_detail'),
 ]
+
