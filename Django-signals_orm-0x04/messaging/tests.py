@@ -2,9 +2,9 @@
 
 from django.test import TestCase
 from django.contrib.auth.models import User
-from .models import Message, Notification
+from .models import Message, Notification, MessageHistory
 from django.db.models import signals # Import signals module to disconnect
-from messaging.signals import create_notification_on_message # Import the signal handler
+from messaging.signals import create_notification_on_message, log_message_edit # Import signal handlers
 
 class MessageSignalTest(TestCase):
 
@@ -15,11 +15,14 @@ class MessageSignalTest(TestCase):
         cls.user2 = User.objects.create_user(username='receiver_user', password='password123')
 
     def setUp(self):
-        # Disconnect the signal during tests to prevent interference,
-        # then explicitly call the signal handler for testing purposes
-        # or, in this case, test the signal's effect directly.
-        # For post_save signals, it's often better to let it run and check the outcome.
-        pass
+        # Ensure signals are connected for tests that rely on them
+        post_save.connect(create_notification_on_message, sender=Message)
+        pre_save.connect(log_message_edit, sender=Message)
+
+    def tearDown(self):
+        # Disconnect signals after each test to prevent interference between tests
+        post_save.disconnect(create_notification_on_message, sender=Message)
+        pre_save.disconnect(log_message_edit, sender=Message)
 
     def test_notification_created_on_new_message(self):
         """
@@ -45,6 +48,8 @@ class MessageSignalTest(TestCase):
         self.assertEqual(notification.message, message)
         self.assertEqual(notification.user, self.user2)
         self.assertFalse(notification.is_read) # Should be unread by default
+        self.assertFalse(message.edited) # Should not be edited on creation
+
 
     def test_no_notification_on_message_update(self):
         """
@@ -65,3 +70,78 @@ class MessageSignalTest(TestCase):
 
         # The count of notifications should remain 1
         self.assertEqual(Notification.objects.filter(user=self.user2).count(), 1)
+
+    def test_message_edit_history(self):
+        """
+        Test that MessageHistory is created and 'edited' flag is set when a message is updated.
+        """
+        # Create an initial message
+        message = Message.objects.create(
+            sender=self.user1,
+            receiver=self.user2,
+            content="Original message content."
+        )
+        self.assertFalse(message.edited)
+        self.assertEqual(MessageHistory.objects.count(), 0)
+
+        # Update the message content
+        old_content = message.content
+        message.content = "New, edited message content."
+        message.save()
+
+        # Check that a MessageHistory entry was created
+        self.assertEqual(MessageHistory.objects.count(), 1)
+        history_entry = MessageHistory.objects.first()
+
+        self.assertEqual(history_entry.message, message)
+        self.assertEqual(history_entry.old_content, old_content)
+
+        # Retrieve the message again from DB to ensure 'edited' flag is saved
+        updated_message = Message.objects.get(pk=message.pk)
+        self.assertTrue(updated_message.edited)
+
+        # Update again to ensure another history entry is created
+        old_content_2 = updated_message.content
+        updated_message.content = "Second edit."
+        updated_message.save()
+
+        self.assertEqual(MessageHistory.objects.count(), 2)
+        history_entry_2 = MessageHistory.objects.order_by('-edited_at').first()
+        self.assertEqual(history_entry_2.old_content, old_content_2)
+        self.assertTrue(updated_message.edited)
+
+    def test_no_history_on_message_creation(self):
+        """
+        Test that no MessageHistory is created when a new message is first created.
+        """
+        self.assertEqual(MessageHistory.objects.count(), 0)
+        Message.objects.create(
+            sender=self.user1,
+            receiver=self.user2,
+            content="A brand new message."
+        )
+        self.assertEqual(MessageHistory.objects.count(), 0) # Should still be 0
+
+    def test_no_history_on_no_content_change(self):
+        """
+        Test that no MessageHistory is created if a message is saved but content doesn't change.
+        """
+        message = Message.objects.create(
+            sender=self.user1,
+            receiver=self.user2,
+            content="Content that won't change."
+        )
+        self.assertEqual(MessageHistory.objects.count(), 0)
+
+        # Save without changing content
+        message.save()
+        self.assertEqual(MessageHistory.objects.count(), 0) # Still 0
+
+        # Change a non-content field (e.g., timestamp, though auto_now_add makes this tricky)
+        # For demonstration, let's assume we could change another field without content change
+        # In a real scenario, you might have other fields.
+        # For simplicity, we'll just re-save and expect no history if content is identical.
+        message_from_db = Message.objects.get(pk=message.pk)
+        message_from_db.save() # Saving without content change
+        self.assertEqual(MessageHistory.objects.count(), 0)
+
