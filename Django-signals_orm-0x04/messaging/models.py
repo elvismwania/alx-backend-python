@@ -8,7 +8,7 @@ class Message(models.Model):
     receiver = models.ForeignKey(User, related_name='received_messages', on_delete=models.CASCADE)
     content = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
-    edited = models.BooleanField(default=False) # New field to track if message has been edited
+    edited = models.BooleanField(default=False) # Field to track if message has been edited
 
     class Meta:
         ordering = ['-timestamp']
@@ -39,6 +39,10 @@ class MessageHistory(models.Model):
     message = models.ForeignKey(Message, related_name='history', on_delete=models.CASCADE)
     old_content = models.TextField()
     edited_at = models.DateTimeField(auto_now_add=True)
+    # This field tracks who edited the message.
+    # It's set to the sender of the message in the signal, assuming they are the editor.
+    edited_by = models.ForeignKey(User, related_name='edited_messages_history', on_delete=models.SET_NULL, null=True)
+
 
     class Meta:
         ordering = ['-edited_at']
@@ -46,6 +50,8 @@ class MessageHistory(models.Model):
         verbose_name_plural = "Message Histories"
 
     def __str__(self):
-        return f"History for Message ID {self.message.id} (Edited at {self.edited_at.strftime('%Y-%m-%d %H:%M')})"
+        editor_username = self.edited_by.username if self.edited_by else 'Unknown'
+        return f"History for Message ID {self.message.id} by {editor_username} (Edited at {self.edited_at.strftime('%Y-%m-%d %H:%M')})"
+
 
 
