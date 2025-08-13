@@ -1,0 +1,11 @@
+#!/bin/bash
+# messaging_app/kurbeScript
+
+# Start minikube with docker driver (no sudo!)
+minikube start --driver=docker
+
+# Verify cluster info
+kubectl cluster-info
+
+# Get all pods (should be empty initially)
+kubectl get pods
