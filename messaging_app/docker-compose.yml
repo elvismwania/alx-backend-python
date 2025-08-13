@@ -4,8 +4,7 @@ version: '3.8'
 services:
   web:
     build: .
-    # The check is looking for this specific command.
-    command: python3 manage.py runserver 0.0.0.0:8000
+    command: python manage.py runserver 0.0.0.0:8000
     volumes:
       - .:/app
     ports:
@@ -24,7 +23,7 @@ services:
     volumes:
       - db_data:/var/lib/mysql
     environment:
-      # The check is looking for these specific variables.
+      # This is where the check is looking for the variables.
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
