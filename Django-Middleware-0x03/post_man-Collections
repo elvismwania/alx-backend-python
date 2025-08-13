@@ -1,0 +1,272 @@
+{
+	"info": {
+		"_postman_id": "e855419d-5d6a-42ad-bc8c-a0e831e7e3b8",
+		"name": "post_man-Collections",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "37165152"
+	},
+	"item": [
+		{
+			"name": "Signup",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "email",
+							"value": "actual3@gmail.com",
+							"type": "text"
+						},
+						{
+							"key": "password",
+							"value": "actual",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{baseURL}}/signup/",
+					"host": [
+						"{{baseURL}}"
+					],
+					"path": [
+						"signup",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Login(Get jwt token)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "email",
+							"value": "actual@gmail.com",
+							"type": "text"
+						},
+						{
+							"key": "password",
+							"value": "actual",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{baseURL}}/api/token/",
+					"host": [
+						"{{baseURL}}"
+					],
+					"path": [
+						"api",
+						"token",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "List Conversations",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{access}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"url": {
+					"raw": "{{baseURL}}/api/conversations/",
+					"host": [
+						"{{baseURL}}"
+					],
+					"path": [
+						"api",
+						"conversations",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Conversations",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{access}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"participants\": [\r\n        \"195fe686-49b7-4b98-9807-26a5ba9a6fe0\",\r\n        \"b3add609-1b12-40bd-9919-bf31ef2e9c34\"\r\n    ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseURL}}/api/users/{{first_id}}/conversations/",
+					"host": [
+						"{{baseURL}}"
+					],
+					"path": [
+						"api",
+						"users",
+						"{{first_id}}",
+						"conversations",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Send Message",
+			"request": {
+				"method": "GET",
+				"header": []
+			},
+			"response": []
+		},
+		{
+			"name": "Fetch conversation",
+			"request": {
+				"method": "GET",
+				"header": []
+			},
+			"response": []
+		},
+		{
+			"name": "Fetch Message",
+			"request": {
+				"method": "GET",
+				"header": []
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseURL",
+			"value": "http://localhost:8000",
+			"type": "default"
+		},
+		{
+			"key": "access",
+			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUzOTMwNjQ2LCJpYXQiOjE3NTM4ODc0NDYsImp0aSI6ImIxYzI4YTYzNjRhMTQxZDlhYmNhNGFhODZhZjgyYTQwIiwidXNlcl9pZCI6ImNlNTZmNjBjLWRlOTAtNGZkZi1iZjliLTQ5MzIzNjk1M2RiYiJ9.RzGv97fQd8Ltis8TEA5rgQhT8r5UejOq6ok9S786KXU",
+			"type": "string"
+		},
+		{
+			"key": "refresh",
+			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc1NjQ3OTQ0NiwiaWF0IjoxNzUzODg3NDQ2LCJqdGkiOiI1YmJmZjBlMTU0MDY0ODI4OTkyZGEyYTE4M2U0OWVlYyIsInVzZXJfaWQiOiJjZTU2ZjYwYy1kZTkwLTRmZGYtYmY5Yi00OTMyMzY5NTNkYmIifQ.ZAuLvKrqJAeqJRv0ZzGZHnCUhcv2x4l2OTbRbQwDVRE",
+			"type": "string"
+		},
+		{
+			"key": "first_refresh",
+			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc1NjQ4MDM0OSwiaWF0IjoxNzUzODg4MzQ5LCJqdGkiOiJjOTQwYjQ4YzIxNzc0MTJiYmQ5MTI4NmM2MTg3ZGUwMyIsInVzZXJfaWQiOiIxOTVmZTY4Ni00OWI3LTRiOTgtOTgwNy0yNmE1YmE5YTZmZTAifQ.Ic4dsHGQKzV3U9WoHi1RHBEAiLn2guLIMrGNGg28rjo",
+			"type": "string"
+		},
+		{
+			"key": "first_access",
+			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUzOTMxNTQ5LCJpYXQiOjE3NTM4ODgzNDksImp0aSI6IjViN2Y2ODBlMzYzOTRkMmZiZjYzNTdlYzk4ZTYxNzAxIiwidXNlcl9pZCI6IjE5NWZlNjg2LTQ5YjctNGI5OC05ODA3LTI2YTViYTlhNmZlMCJ9.NLD8S7wUBKZbd7Ww5ZnkWMpPhGdTyD9WDiZoms46xAE",
+			"type": "string"
+		},
+		{
+			"key": "second_refresh",
+			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc1NjQ4MDQwNSwiaWF0IjoxNzUzODg4NDA1LCJqdGkiOiI1NTFkZDMzNmVkNTU0NGNmODFkODEyNzdhZWM0YTI3NiIsInVzZXJfaWQiOiJiM2FkZDYwOS0xYjEyLTQwYmQtOTkxOS1iZjMxZWYyZTljMzQifQ.BkLmbLyFE_UDjxQ1udkbIMI-vfBQGwCwOw__L8fE7WM",
+			"type": "string"
+		},
+		{
+			"key": "second_access",
+			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUzOTMxNjA1LCJpYXQiOjE3NTM4ODg0MDUsImp0aSI6IjFhNmUyYzZmZGU3ZjQ0Zjg5NTk0NDVmMDUxMjI3NmRiIiwidXNlcl9pZCI6ImIzYWRkNjA5LTFiMTItNDBiZC05OTE5LWJmMzFlZjJlOWMzNCJ9.61BLGyVMA1cKjEadVMylvxiA2hwKfR7vXkLA88N0H28",
+			"type": "string"
+		},
+		{
+			"key": "first_id",
+			"value": "195fe686-49b7-4b98-9807-26a5ba9a6fe0",
+			"type": "string"
+		},
+		{
+			"key": "second_Id",
+			"value": "b3add609-1b12-40bd-9919-bf31ef2e9c34",
+			"type": "string"
+		},
+		{
+			"key": "convo_id",
+			"value": "656f11ea-f901-4012-8fff-03f63c07b07a",
+			"type": "string"
+		}
+	]
+}
