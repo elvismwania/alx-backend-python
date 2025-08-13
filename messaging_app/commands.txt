@@ -1,0 +1,2 @@
+kubectl apply -f messaging_app/ingress.yaml
+kubectl get ingress django-messaging-ingress

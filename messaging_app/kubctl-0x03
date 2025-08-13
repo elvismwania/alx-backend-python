@@ -1,0 +1,19 @@
+#!/bin/bash
+# messaging_app/kubctl-0x03
+
+# Update image version to 2.0 in blue deployment YAML manually before running this script
+
+kubectl apply -f messaging_app/blue_deployment.yaml
+
+# Monitor rollout status
+kubectl rollout status deployment/django-messaging-blue
+
+# Test app availability during rollout
+echo "Testing for downtime with curl..."
+for i in {1..20}; do
+  curl -s http://$(minikube service django-messaging-service --url) || echo "Request failed"
+  sleep 1
+done
+
+# Verify pods are running
+kubectl get pods -l app=django-messaging,version=blue

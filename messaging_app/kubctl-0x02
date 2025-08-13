@@ -1,0 +1,13 @@
+#!/bin/bash
+# messaging_app/kubctl-0x02
+
+kubectl apply -f messaging_app/blue_deployment.yaml
+kubectl apply -f messaging_app/green_deployment.yaml
+kubectl apply -f messaging_app/kubeservice.yaml
+
+echo "Waiting for pods to be ready..."
+kubectl rollout status deployment/django-messaging-blue
+kubectl rollout status deployment/django-messaging-green
+
+echo "Check logs for green deployment:"
+kubectl logs -l app=django-messaging,version=green --tail=20
