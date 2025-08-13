@@ -12,7 +12,6 @@ services:
     depends_on:
       - db
     environment:
-      # These environment variables will be passed to your Django application
       DATABASE_NAME: ${MYSQL_DATABASE}
       DATABASE_USER: ${MYSQL_USER}
       DATABASE_PASSWORD: ${MYSQL_PASSWORD}
@@ -24,7 +23,7 @@ services:
     volumes:
       - db_data:/var/lib/mysql
     environment:
-      # The check is looking for these specific variables to be defined.
+      # This is where the check is looking for the variables.
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
