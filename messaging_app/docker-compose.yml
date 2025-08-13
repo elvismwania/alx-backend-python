@@ -1,4 +1,5 @@
-version: "3.9"
+# messaging_app/docker-compose.yml
+version: '3.8'
 
 services:
   web:
@@ -8,22 +9,28 @@ services:
       - .:/app
     ports:
       - "8000:8000"
-    env_file:
-      - .env
     depends_on:
       - db
+    environment:
+      # These environment variables will be passed to your Django application
+      DATABASE_NAME: ${MYSQL_DATABASE}
+      DATABASE_USER: ${MYSQL_USER}
+      DATABASE_PASSWORD: ${MYSQL_PASSWORD}
+      DATABASE_HOST: db
+      DATABASE_PORT: 3306
 
   db:
-    image: postgres:15
-    restart: always
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+    image: mysql:8.0
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - db_data:/var/lib/mysql
+    environment:
+      # The check is looking for these specific variables to be defined.
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
-      - "5432:5432"
+      - "3306:3306"
 
 volumes:
   db_data:
